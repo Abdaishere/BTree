@@ -2,56 +2,23 @@
 
 using namespace std;
 
-//template<class T>
-//class key {
-//    T val;
-//    key *next;
-//public:
-//    key(T val){
-//        this->val = val;
-//        next = nullptr;
-//    }
-//    key *getnext() {
-//        return next;
-//    }
-//
-//    void insert(T input) {
-//        key *curr = this;
-//        while (curr->next != nullptr && curr->next->val <= input) {
-//            curr = curr->next;
-//        }
-//        key<T> *newkey = new key(input);
-//        newkey->val = input;
-//        newkey->next = curr->next;
-//        curr->next = newkey;
-//    }
-//
-//    void print() {
-//        key *curr = this;
-//        while (curr->next != nullptr){
-//            std::cout<<curr->val<<' ';
-//            curr = curr->next;
-//        }
-//    }
-//};
+int static caat = 0;
 
-
-//template<class int>
-class BtreeNode {
-    BtreeNode() {}
+template<class T, int U>
+class BTree {
 
     class key {
     public:
-        int val;
-        BtreeNode *right, *left;
+        T val;
+        BTree *right, *left;
     } *keys;
 
-    BtreeNode *parent;
-    int m, size, isleaf;
-
+    BTree *parent;
+    int size;
+    bool isleaf;
+    int m = U;
 
     void split() {
-        cout << "splitting\n";
         int mid = m / 2;
         key *tmpleft = new key[m / 2];
         for (int i = 0; i < m / 2; i++) {
@@ -62,47 +29,53 @@ class BtreeNode {
             tmpright[i] = keys[m / 2 + i + 1];
         }
         key midkey = keys[mid];
-        midkey.right = new BtreeNode(m, tmpright, this);
-        midkey.left = new BtreeNode(m, tmpleft, this);
-        delete[] keys;
+
+        size = 0;
         if (parent == nullptr) {
-            size = 0;
+            midkey.right = new BTree(tmpright, this);
+            midkey.left = new BTree(tmpleft, this);
+            isleaf = 0;
             keys = new key[++size];
             keys[0] = midkey;
-        } else
-            this->parent->insertkey(midkey);
-        if (this->parent->getKeys()[0].left == this)
-            this->parent->getKeys()[0].left = 0;
-        else
-            for (int i = 0; i < parent->getSize(); i++)
-                if (this->parent->getKeys()[0].right == this)
-                    this->parent->getKeys()[0].right = 0;
-        delete this;
+        } else {
+            midkey.right = new BTree(tmpright, parent);
+            midkey.left = new BTree(tmpleft, parent);
+            parent->insertkey(midkey);
+            delete[]keys;
+        }
     }
 
-    BtreeNode(int m, key *keys, BtreeNode *parent) {
-        this->m = m;
-        this->keys = keys;
+    BTree(key *keys, BTree *parent) {
         size = m / 2;
-        this->parent = parent;
         isleaf = 1;
+        for (int i = 0; i < size; i++) {
+            if (keys[i].left != NULL) {
+                keys[i].left->parent = this;
+                isleaf = 0;
+            }
+            if (keys[i].right != NULL) {
+                keys[i].right->parent = this;
+                isleaf = 0;
+            }
+        }
+        this->keys = keys;
+        this->parent = parent;
     }
 
 public:
 
-    ~BtreeNode() {
-        delete[]keys;
-        delete parent;
-    }
-
-    BtreeNode(int m, BtreeNode *parent) {
-        this->m = m;
+    BTree(BTree *parent) {
         keys = nullptr;
         size = 0;
+        isleaf = 1;
+        if (parent != nullptr)
+            parent->isleaf = 0;
         this->parent = parent;
     }
 
-    void insertval(int input) {
+    void insertval(T input) {
+        if (!this->isleaf)
+            throw "cannot insert value in a none leaf node";
         key newkey;
         newkey.left = nullptr;
         newkey.right = nullptr;
@@ -115,22 +88,39 @@ public:
         key *tmp = new key[++size];
         int i = 0, j = 0;
         for (; j < size - 1; i++, j++) {
-            if (keys[i].val > input) {
+            if (j == i && keys[i].val > input) {
                 tmp[j++] = newkey;
             }
             tmp[j] = keys[i];
         }
         if (j > i) {
             tmp[size - 1] = keys[size - 2];
-        } else
+        } else {
             tmp[size - 1] = newkey;
-
-        for (int i = 0; i < size; i++) {
-            cout << (tmp[i].left == nullptr) << ' ' << (tmp[i].right == nullptr) << '\n';
         }
+
         keys = tmp;
-        if (size == m)
+        if (size == m) {
             split();
+        }
+    }
+
+    void Insert(T input) {
+        BTree *curr = this;
+        while (!curr->isleaf) {
+            bool found = 0;
+            for (int i = 0; i < curr->size; i++) {
+                if (curr->keys[i].val > input) {
+                    curr = curr->keys[i].left;
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                curr = curr->keys[curr->size - 1].right;
+            }
+        }
+        curr->insertval(input);
     }
 
     void insertkey(key newkey) {
@@ -140,78 +130,170 @@ public:
             return;
         }
         key *tmp = new key[++size];
-        int i = 0, j = 0;
-        for (; j < size - 1; i++, j++) {
-            if (keys[i].val > newkey.val) {
-                tmp[j++] = newkey;
+        if (keys[0].val > newkey.val) {
+            tmp[0] = newkey;
+            for (int i = 1; i < size; i++) {
+                tmp[i] = keys[i - 1];
             }
-            tmp[j] = keys[i];
-        }
-        if (j > i) {
-            tmp[size - 1] = keys[size - 2];
-        } else
+            tmp[1].left = tmp[0].right;
+        } else if (keys[size - 2].val < newkey.val) {
+            for (int i = 0; i < size - 1; i++) {
+                tmp[i] = keys[i];
+            }
             tmp[size - 1] = newkey;
-
-        for (int i = 0; i < size - 1; i++) {
-            tmp[i].right = tmp[i + 1].left;
+            tmp[size - 2].right = tmp[size - 1].left;
+        } else {
+            int j = 0, i = 0;
+            bool found = 0;
+            for (; j < size; j++, i++) {
+                if (j == i && keys[i].val > newkey.val) {
+                    tmp[j++] = newkey;
+                    tmp[i - 1].right = tmp[i].left;
+                    found = 1;
+                }
+                tmp[j] = keys[i];
+                if (found) {
+                    found = 0;
+                    tmp[j].left = tmp[i].right;
+                }
+            }
         }
 
         keys = tmp;
-        if (size == m)
+        if (size == m) {
             split();
+        }
     }
 
     key *getKeys() const {
         return keys;
     }
 
-    void setKeys(key *keys) {
-        BtreeNode::keys = keys;
+    T getfrontkey() {
+        return keys[0].val;
     }
 
-    BtreeNode *getParent() const {
-        return parent;
-    }
-
-    void setParent(BtreeNode *parent) {
-        BtreeNode::parent = parent;
-    }
-
-    int getM() const {
-        return m;
-    }
-
-    void setM(int m) {
-        BtreeNode::m = m;
+    T getbackkey() {
+        return keys[size - 1].val;
     }
 
     int getSize() const {
         return size;
     }
 
-    void setSize(int size) {
-        BtreeNode::size = size;
+
+    bool getIsleaf() const {
+        return isleaf;
     }
 
-};
+    void Print() {
+        caat = 0;
+        PrintNode(this);
+    }
 
 
-void printNode(BtreeNode *node) {
-    if (node != nullptr) {
-        printNode(node->getKeys()[0].left);
-        for (int i = 0; i < node->getSize(); i++) {
-            cout << node->getKeys()[i].val << ' ';
-            printNode(node->getKeys()[i].right);
+    void PrintNodeinorder(BTree *node) {
+        if (!node->getIsleaf()) {
+            PrintNodeinorder(node->getKeys()[0].left);
+            for (int i = 0; i < node->getSize(); i++) {
+                cout << node->getKeys()[i].val << ", "[i == node->getSize() - 1];
+                PrintNodeinorder(node->getKeys()[i].right);
+            }
+        } else {
+            for (int i = 0; i < node->getSize(); i++) {
+                cout << node->getKeys()[i].val << ", "[i == node->getSize() - 1];
+            }
         }
     }
-}
 
+    void PrintNode(BTree *node) {
+        cout << cattt(caat++);
+        for (int i = 0; i < node->getSize(); i++) {
+            cout << node->getKeys()[i].val << ",\n"[i == node->getSize() - 1];
+        }
+        if (!node->getIsleaf()) {
+            PrintNode(node->getKeys()[0].left);
+            for (int i = 0; i < node->getSize(); i++) {
+                PrintNode(node->getKeys()[i].right);
+            }
+        }
+        caat--;
+    }
 
-int main() {
-    BtreeNode head(3, nullptr);
-    head.insertval(8);
-    head.insertval(44);
-    head.insertval(1);
-    printNode(&head);
+    BTree() {
+        keys = nullptr;
+        size = 0;
+        isleaf = 1;
+        this->parent = nullptr;
+    }
+
+    string cattt(int i) {
+        string catt = "";
+        while (i--) {
+            catt += ' ';
+        }
+        return catt;
+    }
+};
+
+int main()
+{
+    // Construct a BTree of order 3, which stores int data
+    BTree<int,3> t1;
+
+    t1.Insert(1);
+    t1.Insert(5);
+    t1.Insert(0);
+    t1.Insert(4);
+    t1.Insert(3);
+    t1.Insert(2);
+
+    t1.Print(); // Should output the following on the screen:
+
+    /*
+    1,4
+      0
+      2,3
+      5
+    */
+
+    // Construct a BTree of order 5, which stores char data
+    BTree<char,5> t;
+
+    // Look at the example in our lecture:
+    t.Insert('G');
+    t.Insert('I');
+    t.Insert('B');
+    t.Insert('J');
+    t.Insert('C');
+    t.Insert('A');
+    t.Insert('K');
+    t.Insert('E');
+    t.Insert('D');
+    t.Insert('S');
+    t.Insert('T');
+    t.Insert('R');
+    t.Insert('L');
+    t.Insert('F');
+    t.Insert('H');
+    t.Insert('M');
+    t.Insert('N');
+    t.Insert('P');
+    t.Insert('Q');
+
+    t.Print(); // Should output the following on the screen:
+
+    /*
+    K
+      C,G
+        A,B
+        D,E,F
+        H,I,J
+      N,R
+        L,M
+        P,Q
+        S,T
+    */
+
     return 0;
 }
